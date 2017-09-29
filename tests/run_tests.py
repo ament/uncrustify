@@ -5,8 +5,8 @@
 #
 # This could all be done with bash, but I wanted to use python. =)
 # Anyway, this was all done while waiting in the Denver airport.
-# * @author  Guy Maurel since version 0.62 for uncrustify4Qt
-# *          October 2015
+# * @author  Ben Gardner October 2009
+# * @author  Guy Maurel  October 2015
 #
 
 import argparse
@@ -17,7 +17,10 @@ import filecmp
 
 # OK, so I just had way too much fun with the colors..
 
-if os.name == "nt":    # windoze doesn't support ansi sequences
+# windows doesn't support ansi sequences (unless using ConEmu and enabled)
+disablecolors = os.name == "nt" and os.environ.get('CONEMUANSI', '') != 'ON'
+
+if disablecolors:
     NORMAL      = ""
     BOLD        = ""
     UNDERSCORE  = ""
@@ -67,16 +70,18 @@ BGB_WHITE   = "\033[107m"
 
 # after all that, I chose c
 
-if os.name == "nt":    # windoze doesn't support ansi sequences
+if disablecolors:
     FAIL_COLOR     = ""
     PASS_COLOR     = ""
     MISMATCH_COLOR = ""
     UNSTABLE_COLOR = ""
+    SKIP_COLOR     = ""
 else:
     FAIL_COLOR     = UNDERSCORE
     PASS_COLOR     = FG_GREEN
     MISMATCH_COLOR = FG_RED #REVERSE
     UNSTABLE_COLOR = FGB_CYAN
+    SKIP_COLOR     = FGB_YELLOW
 
 def run_tests(args, test_name, config_name, input_name, lang):
     # print("Test:  ", test_name)
@@ -162,6 +167,27 @@ def process_test_file(args, filename):
         parts = line.split()
         if (len(parts) < 3) or (parts[0][0] == '#'):
             continue
+        if args.r != None:
+            test_name = parts[0]
+            # remove special suffixes (eg. '!')
+            if not test_name[-1].isdigit():
+                test_name = test_name[:-1]
+            test_nb = int(test_name)
+            # parse range list (eg. 10001-10010,10030-10050,10063)
+            range_filter = args.r
+            filtered = True
+            for value in range_filter.split(","):
+                t = value.split("-")
+                a = b = int(t[0])
+                if len(t) > 1:
+                    b = int(t[1])
+                if test_nb >= a and test_nb <= b:
+                    filtered = False
+                    break
+            if filtered:
+                if args.p:
+                    print(SKIP_COLOR + "SKIPPED: " + NORMAL + parts[0])
+                continue
         lang = ""
         if len(parts) > 3:
             lang = "-l " + parts[3]
@@ -179,27 +205,42 @@ def process_test_file(args, filename):
 # entry point
 #
 def main(argv):
-    if os.name == "nt":
-        bin_path = '../win32/Debug/uncrustify.exe'
-    else:
-        bin_path = '../src/uncrustify'
-
-    all_tests = "c-sharp c cpp d java pawn objective-c vala ecma".split()
+    all_tests = "c-sharp c cpp d java pawn objective-c vala ecma imported".split()
 
     parser = argparse.ArgumentParser(description='Run uncrustify tests')
     parser.add_argument('-c', help='show commands', action='store_true')
     parser.add_argument('-d', help='show diff on failure', action='store_true')
-    parser.add_argument('-p', help='show passes', action='store_true')
+    parser.add_argument('-p', help='show passed/skipped tests', action='store_true')
     parser.add_argument('-g', help='generate debug files (.log, .unc)', action='store_true')
+    parser.add_argument('-r', help='specify test filter range list', type=str, default=None)
     parser.add_argument('--results', help='specify results folder', type=str, default='results')
     parser.add_argument('--exe', help='uncrustify executable to test',
-                        type=str, default=bin_path)
+                        type=str)
     parser.add_argument('tests', metavar='TEST', help='test(s) to run (default all)',
                         type=str, default=all_tests, nargs='*')
     args = parser.parse_args()
 
-    if not os.path.isabs(args.exe):
-        args.exe = os.path.abspath(args.exe)
+    # Save current working directory from which the script is called to be able to resolve relative --exe paths
+    cwd = os.getcwd()
+    os.chdir(os.path.dirname(os.path.realpath(__file__)))
+
+    if not args.exe:
+        if os.name == "nt":
+            bin_path = '../win32/{0}/uncrustify.exe'
+            if args.g:
+                bin_path = bin_path.format('Debug')
+            else:
+                bin_path = bin_path.format('Release')
+        else:
+            bin_path = '../src/uncrustify'
+        args.exe = os.path.abspath(bin_path)
+    else:
+        if not os.path.isabs(args.exe):
+            args.exe = os.path.normpath(os.path.join(cwd, args.exe))
+
+    if not os.path.exists(args.exe):
+        print(FAIL_COLOR + "FAILED: " + NORMAL + "Cannot find uncrustify executable")
+        return -1
 
     # do a sanity check on the executable
     cmd = '"%s" > %s' % (args.exe, "usage.txt")

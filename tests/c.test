@@ -128,6 +128,7 @@
 00403   align-2.cfg            c/align-var.c
 00404   align-3.cfg            c/align-var.c
 00405   align-3.cfg            c/bits.c
+00406   bug_i_771.cfg          c/bug_i_771.c
 
 00411   ben.cfg                c/align-typedef.c
 00412   align_typedef_func-0.cfg c/align-typedef.c
@@ -142,6 +143,11 @@
 00432   indent_paren_close-2.cfg c/paren-indent.c
 
 00440   bug_489.cfg c/bug_489.c
+
+00451   nl_enum_own_lines-1.cfg c/enum_gallery.c
+00452   nl_enum_own_lines-2.cfg c/enum_gallery.c
+00453   nl_enum_own_lines-3.cfg c/enum_gallery.c
+00454   nl_enum_own_lines-4.cfg c/enum_gallery.c
 
 # boolean and comma positioning
 00501   bool-pos-eol.cfg        c/bool-pos.c
@@ -230,6 +236,8 @@
 01070  label_colon_nl_1.cfg    c/various_colons.c
 01071  label_colon_nl_2.cfg    c/various_colons.c
 
+01080  empty.cfg               c/bug_1196.c
+
 # big general tests
 02000 ben.cfg                  c/i2c-core.c
 02001 preproc-cleanup.cfg      c/directfb.h
@@ -297,6 +305,7 @@
 02504 align_keep_extra.cfg      c/align_keep_extra.c
 
 02510 ben.cfg                   c/asm.c
+10004 ben.cfg                   c/pragma_asm.c
 
 07630 indent-vbrace.cfg         c/indent-vbrace.c
 
@@ -305,6 +314,15 @@
 09594 ben.cfg                   c/sf594.c
 09588 ben.cfg                   c/sf588.c
 
-10001 sp_after_sparen.cfg       c/sp_after_sparen.c
+09601 sp_after_sparen.cfg       c/sp_after_sparen.c
 
-10002 bug_671.cfg               c/bug_671.c
+09602 bug_671.cfg               c/bug_671.c
+
+09603 indent_ternary-1.cfg      c/indent_ternary-1.c
+09604 indent_ternary-2.cfg      c/indent_ternary-2.c
+
+09610 bug_i_876.cfg             c/bug_i_876.c
+09611 bug_i_222.cfg             c/bug_i_222.c
+09612 bug_1041.cfg              c/bug_1041.c
+
+10005  enable_processing_cmt-empty.cfg    c/i1270.c
