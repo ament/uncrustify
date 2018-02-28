@@ -1,3 +1,0 @@
-Unmatched BRACE_CLOSE
-at line=11, column=1
-Try the option 'tok_split_gte = true'

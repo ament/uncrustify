@@ -24,6 +24,10 @@
 #include <cerrno>
 #include "unc_ctype.h"
 
+
+using namespace std;
+
+
 static const char *DOC_TEXT_END = R"___(
 # Meaning of the settings:
 #   Ignore - do not do any changes
@@ -314,6 +318,8 @@ void register_options(void)
    unc_add_option("sp_arith", UO_sp_arith, AT_IARF,
                   "Add or remove space around arithmetic operator '+', '-', '/', '*', etc\n"
                   "also '>>>' '<<' '>>' '%' '|'.");
+   unc_add_option("sp_arith_additive", UO_sp_arith_additive, AT_IARF,
+                  "Add or remove space around arithmetic operator '+' and '-'. Overrides sp_arith");
    unc_add_option("sp_assign", UO_sp_assign, AT_IARF,
                   "Add or remove space around assignment operator '=', '+=', etc.");
    unc_add_option("sp_cpp_lambda_assign", UO_sp_cpp_lambda_assign, AT_IARF,
@@ -395,6 +401,8 @@ void register_options(void)
                   "Add or remove space before '<>'.");
    unc_add_option("sp_inside_angle", UO_sp_inside_angle, AT_IARF,
                   "Add or remove space inside '<' and '>'.");
+   unc_add_option("sp_angle_colon", UO_sp_angle_colon, AT_IARF,
+                  "Add or remove space between '<>' and ':'.");
    unc_add_option("sp_after_angle", UO_sp_after_angle, AT_IARF,
                   "Add or remove space after '<>'.");
    unc_add_option("sp_angle_paren", UO_sp_angle_paren, AT_IARF,
@@ -473,9 +481,7 @@ void register_options(void)
    unc_add_option("sp_after_operator_sym", UO_sp_after_operator_sym, AT_IARF,
                   "Add or remove space between the operator symbol and the open paren, as in 'operator ++('.");
    unc_add_option("sp_after_operator_sym_empty", UO_sp_after_operator_sym_empty, AT_IARF,
-                  "Add or remove space between the operator symbol and the open paren when the operator\n"
-                  "has no arguments, as in 'operator *()'.\n"
-                  "Have precedence of sp_after_operator_sym.");
+                  "Overrides sp_after_operator_sym when the operator has no arguments, as in 'operator *()'.");
    unc_add_option("sp_after_cast", UO_sp_after_cast, AT_IARF,
                   "Add or remove space after C/D cast, i.e. 'cast(int)a' vs 'cast(int) a' or '(int)a' vs '(int) a'.");
    unc_add_option("sp_inside_paren_cast", UO_sp_inside_paren_cast, AT_IARF,
@@ -702,10 +708,10 @@ void register_options(void)
                   "Controls the spaces inside paren of the new operator: 'new(foo) BAR'.");
    unc_add_option("sp_inside_newop_paren_open", UO_sp_inside_newop_paren_open, AT_IARF,
                   "Controls the space after open paren of the new operator: 'new(foo) BAR'.\n"
-                  "Have precedence of sp_inside_newop_paren.");
+                  "Overrides sp_inside_newop_paren.");
    unc_add_option("sp_inside_newop_paren_close", UO_sp_inside_newop_paren_close, AT_IARF,
                   "Controls the space before close paren of the new operator: 'new(foo) BAR'.\n"
-                  "Have precedence of sp_inside_newop_paren.");
+                  "Overrides sp_inside_newop_paren.");
    unc_add_option("sp_before_tr_emb_cmt", UO_sp_before_tr_emb_cmt, AT_IARF,
                   "Controls the spaces before a trailing or embedded comment.");
    unc_add_option("sp_num_before_tr_emb_cmt", UO_sp_num_before_tr_emb_cmt, AT_UNUM,
@@ -919,6 +925,8 @@ void register_options(void)
                   "0: (Default) off\n"
                   "1: When the `if_false` is a continuation, indent it under `if_false`\n"
                   "2: When the `:` is a continuation, indent it under `?`", "", 0, 2);
+   unc_add_option("indent_ignore_asm_block", UO_indent_ignore_asm_block, AT_BOOL,
+                  "If true, ignore indent and align for asm blocks as they have their own indentation.");
 
    unc_begin_group(UG_newline, "Newline adding and removing options");
    unc_add_option("nl_collapse_empty_body", UO_nl_collapse_empty_body, AT_BOOL,
@@ -963,7 +971,7 @@ void register_options(void)
    unc_add_option("nl_typedef_blk_start", UO_nl_typedef_blk_start, AT_UNUM,
                   "The number of newlines before a block of typedefs\n"
                   "0 = No change (default)\n"
-                  "the option 'nl_after_access_spec' takes preference over 'nl_typedef_blk_start'.");
+                  "is overridden by the option 'nl_after_access_spec'.");
    unc_add_option("nl_typedef_blk_end", UO_nl_typedef_blk_end, AT_UNUM,
                   "The number of newlines after a block of typedefs\n"
                   "0 = No change (default).");
@@ -973,7 +981,7 @@ void register_options(void)
    unc_add_option("nl_var_def_blk_start", UO_nl_var_def_blk_start, AT_UNUM,
                   "The number of newlines before a block of variable definitions not at the top of a function body\n"
                   "0 = No change (default)\n"
-                  "the option 'nl_after_access_spec' takes preference over 'nl_var_def_blk_start'.");
+                  "is overridden by the option 'nl_after_access_spec'.");
    unc_add_option("nl_var_def_blk_end", UO_nl_var_def_blk_end, AT_UNUM,
                   "The number of newlines after a block of variable definitions not at the top of a function body\n"
                   "0 = No change (default).");
@@ -1099,6 +1107,8 @@ void register_options(void)
                   "Overrides nl_func_def_paren for functions with no parameters.");
    unc_add_option("nl_func_call_paren", UO_nl_func_call_paren, AT_IARF,
                   "Add or remove newline between a function name and the opening '(' in the call");
+   unc_add_option("nl_func_call_paren_empty", UO_nl_func_call_paren_empty, AT_IARF,
+                  "Overrides nl_func_call_paren for functions with no parameters.");
    unc_add_option("nl_func_decl_start", UO_nl_func_decl_start, AT_IARF,
                   "Add or remove newline after '(' in a function declaration.");
    unc_add_option("nl_func_def_start", UO_nl_func_def_start, AT_IARF,
@@ -1135,6 +1145,8 @@ void register_options(void)
                   "Add or remove newline between '()' in a function declaration.");
    unc_add_option("nl_func_def_empty", UO_nl_func_def_empty, AT_IARF,
                   "Add or remove newline between '()' in a function definition.");
+   unc_add_option("nl_func_call_empty", UO_nl_func_call_empty, AT_IARF,
+                  "Add or remove newline between '()' in a function call.");
    unc_add_option("nl_func_call_start_multi_line", UO_nl_func_call_start_multi_line, AT_BOOL,
                   "Whether to add newline after '(' in a function call if '(' and ')' are in different lines.");
    unc_add_option("nl_func_call_args_multi_line", UO_nl_func_call_args_multi_line, AT_BOOL,
@@ -1299,7 +1311,7 @@ void register_options(void)
    unc_add_option("nl_after_access_spec", UO_nl_after_access_spec, AT_UNUM,
                   "The number of newlines after a 'private:', 'public:', 'protected:', 'signals:' or 'slots:' label.\n"
                   "0 = No change.\n"
-                  "the option 'nl_after_access_spec' takes preference over 'nl_typedef_blk_start' and 'nl_var_def_blk_start'.");
+                  "Overrides 'nl_typedef_blk_start' and 'nl_var_def_blk_start'.");
    unc_add_option("nl_comment_func_def", UO_nl_comment_func_def, AT_UNUM,
                   "The number of newlines between a function def and the function comment.\n"
                   "0 = No change.");
@@ -1380,8 +1392,8 @@ void register_options(void)
                   "Whether to use tabs for aligning.");
    unc_add_option("align_on_tabstop", UO_align_on_tabstop, AT_BOOL,
                   "Whether to bump out to the next tab when aligning.");
-   unc_add_option("align_number_left", UO_align_number_left, AT_BOOL,
-                  "Whether to left-align numbers.");
+   unc_add_option("align_number_right", UO_align_number_right, AT_BOOL,
+                  "Whether to right-align numbers.");
    unc_add_option("align_keep_extra_space", UO_align_keep_extra_space, AT_BOOL,
                   "Whether to keep whitespace not required for alignment.");
    unc_add_option("align_func_params", UO_align_func_params, AT_BOOL,
@@ -1776,7 +1788,7 @@ static void convert_value(const option_map_value *entry, const char *val, op_val
       if (strcasecmp(val, "AUTO") != 0)
       {
          fprintf(stderr, "convert_value: %s:%d Expected 'Auto', 'LF', 'CRLF', or 'CR' for %s, got '%s'\n",
-                 cpd.filename, cpd.line_number, entry->name, val);
+                 cpd.filename.c_str(), cpd.line_number, entry->name, val);
          log_flush(true);
          cpd.error_count++;
       }
@@ -1825,7 +1837,7 @@ static void convert_value(const option_map_value *entry, const char *val, op_val
       {
          fprintf(stderr, "convert_value: %s:%d Expected 'Ignore', 'Join', 'Lead', 'Lead_Brake', "
                  "'Lead_Force', 'Trail', 'Trail_Break', 'Trail_Force' for %s, got '%s'\n",
-                 cpd.filename, cpd.line_number, entry->name, val);
+                 cpd.filename.c_str(), cpd.line_number, entry->name, val);
          log_flush(true);
          cpd.error_count++;
       }
@@ -1843,7 +1855,7 @@ static void convert_value(const option_map_value *entry, const char *val, op_val
          if (entry->type == AT_UNUM && (*val == '-'))
          {
             fprintf(stderr, "%s:%d\n  for the option '%s' is a negative value not possible: %s",
-                    cpd.filename, cpd.line_number, entry->name, val);
+                    cpd.filename.c_str(), cpd.line_number, entry->name, val);
             log_flush(true);
             exit(EX_CONFIG);
          }
@@ -1870,7 +1882,7 @@ static void convert_value(const option_map_value *entry, const char *val, op_val
       if (tmp == nullptr)
       {
          fprintf(stderr, "%s:%d\n  for the assignment: unknown option '%s':",
-                 cpd.filename, cpd.line_number, val);
+                 cpd.filename.c_str(), cpd.line_number, val);
          log_flush(true);
          exit(EX_CONFIG);
       }
@@ -1903,13 +1915,13 @@ static void convert_value(const option_map_value *entry, const char *val, op_val
             return;
          }
          fprintf(stderr, "%s:%d\n  for the assignment: option '%s' could not have negative value %ld",
-                 cpd.filename, cpd.line_number, entry->name, tmp_val);
+                 cpd.filename.c_str(), cpd.line_number, entry->name, tmp_val);
          log_flush(true);
          exit(EX_CONFIG);
       }
 
       fprintf(stderr, "%s:%d\n  for the assignment: expected type for %s is %s, got %s\n",
-              cpd.filename, cpd.line_number,
+              cpd.filename.c_str(), cpd.line_number,
               entry->name, get_argtype_name(entry->type), get_argtype_name(tmp->type));
       log_flush(true);
       exit(EX_CONFIG);
@@ -1948,7 +1960,7 @@ static void convert_value(const option_map_value *entry, const char *val, op_val
       }
 
       fprintf(stderr, "convert_value: %s:%d Expected 'True' or 'False' for %s, got '%s'\n",
-              cpd.filename, cpd.line_number, entry->name, val);
+              cpd.filename.c_str(), cpd.line_number, entry->name, val);
       log_flush(true);
       cpd.error_count++;
       dest->b = false;
@@ -1988,7 +2000,8 @@ static void convert_value(const option_map_value *entry, const char *val, op_val
       }
 
       fprintf(stderr, "%s(%d): %s:%d Expected 'True' or 'False' or 'Ignore' for %s, got '%s'\n",
-              __func__, __LINE__, cpd.filename, cpd.line_number, entry->name, val);
+              __func__, __LINE__, cpd.filename.c_str(), cpd.line_number,
+              entry->name, val);
       log_flush(true);
       cpd.error_count++;
       dest->tfi = TFI_FALSE;
@@ -2023,7 +2036,7 @@ static void convert_value(const option_map_value *entry, const char *val, op_val
       return;
    }
    fprintf(stderr, "convert_value: %s:%d Expected 'Add', 'Remove', 'Force', or 'Ignore' for %s, got '%s'\n",
-           cpd.filename, cpd.line_number, entry->name, val);
+           cpd.filename.c_str(), cpd.line_number, entry->name, val);
    log_flush(true);
    cpd.error_count++;
    dest->a = AV_IGNORE;
@@ -2551,9 +2564,6 @@ string argtype_to_string(argtype_e argtype)
    case AT_NUM:
       return("number");
 
-   case AT_UNUM:
-      return("unsigned number");
-
    case AT_LINE:
       return("auto/lf/crlf/cr");
 
@@ -2562,6 +2572,9 @@ string argtype_to_string(argtype_e argtype)
 
    case AT_STRING:
       return("string");
+
+   case AT_UNUM:
+      return("unsigned number");
 
    case AT_TFI:
       return("false/true/ignore");
@@ -2587,9 +2600,6 @@ const char *get_argtype_name(argtype_e argtype)
    case AT_NUM:
       return("AT_NUM");
 
-   case AT_UNUM:
-      return("AT_UNUM");
-
    case AT_LINE:
       return("AT_LINE");
 
@@ -2598,6 +2608,9 @@ const char *get_argtype_name(argtype_e argtype)
 
    case AT_STRING:
       return("AT_STRING");
+
+   case AT_UNUM:
+      return("AT_UNUM");
 
    case AT_TFI:
       return("AT_TFI");

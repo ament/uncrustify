@@ -22,6 +22,9 @@
 #include "space.h"
 
 
+using namespace std;
+
+
 /*
  *   Here are the items aligned:
  *
@@ -708,7 +711,7 @@ chunk_t *align_assign(chunk_t *first, size_t span, size_t thresh, size_t *p_nl_c
    }
    size_t my_level = first->level;
 
-   LOG_FMT(LALASS, "%s(%d): [%zu]: checking %s on line %zu - span=%zu thresh=%zu\n",
+   LOG_FMT(LALASS, "%s(%d): [my_level is %zu]: start checking with '%s', on orig_line %zu, span is %zu, thresh is %zu\n",
            __func__, __LINE__, my_level, first->text(), first->orig_line, span, thresh);
 
    // If we are aligning on a tabstop, we shouldn't right-align
@@ -726,12 +729,16 @@ chunk_t *align_assign(chunk_t *first, size_t span, size_t thresh, size_t *p_nl_c
    chunk_t *pc = first;
    while (pc != nullptr)
    {
+      LOG_FMT(LALASS, "%s(%d): orig_line is %zu, check pc->text() '%s'\n",
+              __func__, __LINE__, pc->orig_line, pc->text());
       // Don't check inside PAREN or SQUARE groups
       if (  pc->type == CT_SPAREN_OPEN
-         || pc->type == CT_FPAREN_OPEN
+            // || pc->type == CT_FPAREN_OPEN Issue #1340
          || pc->type == CT_SQUARE_OPEN
          || pc->type == CT_PAREN_OPEN)
       {
+         LOG_FMT(LALASS, "%s(%d): Don't check inside PAREN or SQUARE groups, type is %s\n",
+                 __func__, __LINE__, get_token_name(pc->type));
          tmp = pc->orig_line;
          pc  = chunk_skip_to_match(pc);
          if (pc != nullptr)
@@ -825,7 +832,7 @@ chunk_t *align_assign(chunk_t *first, size_t span, size_t thresh, size_t *p_nl_c
 
    if (pc != nullptr)
    {
-      LOG_FMT(LALASS, "%s(%d): done on %s on line %zu\n",
+      LOG_FMT(LALASS, "%s(%d): done on '%s' on orig_line %zu\n",
               __func__, __LINE__, pc->text(), pc->orig_line);
    }
    else
@@ -1100,7 +1107,7 @@ static void align_same_func_call_params(void)
             {
                as.resize(idx + 1);
                as[idx].Start(3);
-               if (!cpd.settings[UO_align_number_left].b)
+               if (!cpd.settings[UO_align_number_right].b)
                {
                   if (  (chunks[idx]->type == CT_NUMBER_FP)
                      || (chunks[idx]->type == CT_NUMBER)
@@ -1238,14 +1245,14 @@ static chunk_t *align_var_def_brace(chunk_t *start, size_t span, size_t *p_nl_co
    chunk_t *prev = chunk_get_prev_ncnl(start);
    if (prev != nullptr && prev->type == CT_ASSIGN)
    {
-      LOG_FMT(LAVDB, "%s(%d): start=%s [%s] on line %zu (abort due to assign)\n",
+      LOG_FMT(LAVDB, "%s(%d): start->text() '%s', type is %s, on orig_line %zu (abort due to assign)\n",
               __func__, __LINE__, start->text(), get_token_name(start->type), start->orig_line);
 
       chunk_t *pc = chunk_get_next_type(start, CT_BRACE_CLOSE, start->level);
       return(chunk_get_next_ncnl(pc));
    }
 
-   LOG_FMT(LAVDB, "%s(%d): start=%s [%s] on line %zu\n",
+   LOG_FMT(LAVDB, "%s(%d): start->text() '%s', type is %s, on orig_line %zu\n",
            __func__, __LINE__, start->text(), get_token_name(start->type), start->orig_line);
 
    UINT64 align_mask = PCF_IN_FCN_DEF | PCF_VAR_1ST;
@@ -1281,8 +1288,16 @@ static chunk_t *align_var_def_brace(chunk_t *start, size_t span, size_t *p_nl_co
    while (  pc != nullptr
          && (pc->level >= start->level || pc->level == 0))
    {
-      LOG_FMT(LGUY, "%s(%d): %s orig_line is %zu, orig_col is %zu\n",
-              __func__, __LINE__, pc->text(), pc->orig_line, pc->orig_col);
+      if (pc->type == CT_NEWLINE)
+      {
+         LOG_FMT(LAVDB, "%s(%d): orig_line is %zu, orig_col is %zu, NEWLINE\n",
+                 __func__, __LINE__, pc->orig_line, pc->orig_col);
+      }
+      else
+      {
+         LOG_FMT(LAVDB, "%s(%d): orig_line is %zu, orig_col is %zu, text() '%s'\n",
+                 __func__, __LINE__, pc->orig_line, pc->orig_col, pc->text());
+      }
       if (chunk_is_comment(pc))
       {
          if (pc->nl_count > 0)
@@ -1298,6 +1313,7 @@ static chunk_t *align_var_def_brace(chunk_t *start, size_t span, size_t *p_nl_co
 
       if (fp_active && !(pc->flags & PCF_IN_CLASS_BASE))
       {
+         // WARNING: Duplicate from the align_func_proto()
          if (  pc->type == CT_FUNC_PROTO
             || (  pc->type == CT_FUNC_DEF
                && cpd.settings[UO_align_single_line_func].b))
@@ -1305,7 +1321,17 @@ static chunk_t *align_var_def_brace(chunk_t *start, size_t span, size_t *p_nl_co
             LOG_FMT(LAVDB, "%s(%d): add=[%s], orig_line is %zu, orig_col is %zu, level is %zu\n",
                     __func__, __LINE__, pc->text(), pc->orig_line, pc->orig_col, pc->level);
 
-            as.Add(pc);
+            chunk_t *toadd;
+            if (  pc->parent_type == CT_OPERATOR
+               && cpd.settings[UO_align_on_operator].b)
+            {
+               toadd = chunk_get_prev_ncnl(pc);
+            }
+            else
+            {
+               toadd = pc;
+            }
+            as.Add(step_back_over_member(toadd));
             fp_look_bro = (pc->type == CT_FUNC_DEF)
                           && cpd.settings[UO_align_single_line_brace].b;
          }
@@ -1361,10 +1387,14 @@ static chunk_t *align_var_def_brace(chunk_t *start, size_t span, size_t *p_nl_co
          }
       }
 
+      LOG_FMT(LAVDB, "%s(%d): pc->level is %zu, pc->brace_level is %zu\n",
+              __func__, __LINE__, pc->level, pc->brace_level);
       // don't align stuff inside parenthesis/squares/angles
       if (pc->level > pc->brace_level)
       {
          pc = chunk_get_next(pc);
+         LOG_FMT(LAVDB, "%s(%d): pc->orig_line is %zu, pc->orig_col is %zu, pc->text() '%s'\n",
+                 __func__, __LINE__, pc->orig_line, pc->orig_col, pc->text());
          continue;
       }
 
@@ -1374,7 +1404,7 @@ static chunk_t *align_var_def_brace(chunk_t *start, size_t span, size_t *p_nl_co
          && pc->type != CT_FUNC_CLASS_PROTO
          && ((pc->flags & align_mask) == PCF_VAR_1ST)
          && ((pc->level == (start->level + 1)) || pc->level == 0)
-         && pc->prev
+         && pc->prev != nullptr
          && pc->prev->type != CT_MEMBER)
       {
          if (!did_this_line)
@@ -1393,7 +1423,7 @@ static chunk_t *align_var_def_brace(chunk_t *start, size_t span, size_t *p_nl_co
                }
                pc = prev_local->next;
             }
-            LOG_FMT(LAVDB, "%s(%d): add=[%s], orig_line is %zu, orig_col is %zu, level is %zu\n",
+            LOG_FMT(LAVDB, "%s(%d): add='%s', orig_line is %zu, orig_col is %zu, level is %zu\n",
                     __func__, __LINE__, pc->text(), pc->orig_line, pc->orig_col, pc->level);
 
             as.Add(step_back_over_member(pc));
@@ -1625,8 +1655,8 @@ static chunk_t *scan_ib_line(chunk_t *start, bool first_pass)
 
    if (pc != nullptr)
    {
-      LOG_FMT(LSIB, "%s(%d): start=%s col %zu/%zu line %zu\n",
-              __func__, __LINE__, get_token_name(pc->type), pc->column, pc->orig_col, pc->orig_line);
+      LOG_FMT(LSIB, "%s(%d): start: orig_line is %zu, orig_col is %zu, column is %zu, type is %s\n",
+              __func__, __LINE__, pc->orig_line, pc->orig_col, pc->column, get_token_name(pc->type));
    }
 
    while (  pc != nullptr
@@ -1653,12 +1683,24 @@ static chunk_t *scan_ib_line(chunk_t *start, bool first_pass)
          // Is this a new entry?
          if (idx >= cpd.al_cnt)
          {
-            LOG_FMT(LSIB, " - New   [%zu] %.2zu/%zu - %10.10s\n",
-                    idx, pc->column, token_width, get_token_name(pc->type));
+            if (idx == 0)
+            {
+               LOG_FMT(LSIB, "%s(%d): Prepare the 'idx's\n", __func__, __LINE__);
+            }
+            LOG_FMT(LSIB, "%s(%d):   New idx is %2.1zu, pc->column is %2.1zu, text() '%s', token_width is %zu, type is %s\n",
+                    __func__, __LINE__, idx, pc->column, pc->text(), token_width, get_token_name(pc->type));
             cpd.al[cpd.al_cnt].type = pc->type;
             cpd.al[cpd.al_cnt].col  = pc->column;
             cpd.al[cpd.al_cnt].len  = token_width;
             cpd.al_cnt++;
+            if (cpd.al_cnt == AL_SIZE)
+            {
+               fprintf(stderr, "Number of 'entry' to be aligned is too big for the current value %d,\n", AL_SIZE);
+               fprintf(stderr, "at line %zu, column %zu.\n", pc->orig_line, pc->orig_col);
+               fprintf(stderr, "Please make a report.\n");
+               log_flush(true);
+               exit(EX_SOFTWARE);
+            }
             idx++;
          }
          else
@@ -1666,16 +1708,16 @@ static chunk_t *scan_ib_line(chunk_t *start, bool first_pass)
             // expect to match stuff
             if (cpd.al[idx].type == pc->type)
             {
-               LOG_FMT(LSIB, " - Match [%zu] %.2zu/%zu - %10.10s",
-                       idx, pc->column, token_width, get_token_name(pc->type));
+               LOG_FMT(LSIB, "%s(%d):   Match? idx is %2.1zu, orig_line is %2.1zu, column is %2.1zu, token_width is %zu, type is %s\n",
+                       __func__, __LINE__, idx, pc->orig_line, pc->column, token_width, get_token_name(pc->type));
 
                // Shift out based on column
                if (prev_match == nullptr)
                {
                   if (pc->column > cpd.al[idx].col)
                   {
-                     LOG_FMT(LSIB, " [ pc->col(%zu) > col(%zu) ] ",
-                             pc->column, cpd.al[idx].col);
+                     LOG_FMT(LSIB, "%s(%d): [ pc->column (%zu) > cpd.al[%zu].col(%zu) ] \n",
+                             __func__, __LINE__, pc->column, idx, cpd.al[idx].col);
 
                      ib_shift_out(idx, pc->column - cpd.al[idx].col);
                      cpd.al[idx].col = pc->column;
@@ -1683,16 +1725,19 @@ static chunk_t *scan_ib_line(chunk_t *start, bool first_pass)
                }
                else if (idx > 0)
                {
+                  LOG_FMT(LSIB, "%s(%d):   prev_match '%s', prev_match->orig_line is %zu, prev_match->orig_col is %zu\n",
+                          __func__, __LINE__, prev_match->text(), prev_match->orig_line, prev_match->orig_col);
                   int min_col_diff = pc->column - prev_match->column;
                   int cur_col_diff = cpd.al[idx].col - cpd.al[idx - 1].col;
                   if (cur_col_diff < min_col_diff)
                   {
-                     LOG_FMT(LSIB, " [ min_col_diff(%d) > cur_col_diff(%d) ] ",
-                             min_col_diff, cur_col_diff);
+                     LOG_FMT(LSIB, "%s(%d):   pc->orig_line is %zu\n",
+                             __func__, __LINE__, pc->orig_line);
                      ib_shift_out(idx, min_col_diff - cur_col_diff);
                   }
                }
-               LOG_FMT(LSIB, " - now col %zu, len %zu\n", cpd.al[idx].col, cpd.al[idx].len);
+               LOG_FMT(LSIB, "%s(%d): at ende of the loop: now is col %zu, len is %zu\n",
+                       __func__, __LINE__, cpd.al[idx].col, cpd.al[idx].len);
                idx++;
             }
          }
@@ -1708,11 +1753,12 @@ static void align_log_al(log_sev_t sev, size_t line)
 {
    if (log_sev_on(sev))
    {
-      log_fmt(sev, "%s(%d): line %zu, %zu)",
+      log_fmt(sev, "%s(%d): line %zu, cpd.al_cnt is %zu\n",
               __func__, __LINE__, line, cpd.al_cnt);
       for (size_t idx = 0; idx < cpd.al_cnt; idx++)
       {
-         log_fmt(sev, " %zu/%zu=%s", cpd.al[idx].col, cpd.al[idx].len,
+         log_fmt(sev, "   cpd.al[%2.1zu].col is %2.1zu, cpd.al[%2.1zu].len is %zu, type is %s\n",
+                 idx, cpd.al[idx].col, idx, cpd.al[idx].len,
                  get_token_name(cpd.al[idx].type));
       }
       log_fmt(sev, "\n");
@@ -1729,23 +1775,27 @@ static void align_init_brace(chunk_t *start)
    cpd.al_cnt       = 0;
    cpd.al_c99_array = false;
 
-   LOG_FMT(LALBR, "%s(%d): start @ %zu:%zu\n",
+   LOG_FMT(LALBR, "%s(%d): start @ orig_line is %zu, orig_col is %zu\n",
            __func__, __LINE__, start->orig_line, start->orig_col);
 
-   chunk_t *pc = chunk_get_next_ncnl(start);
-   pc = scan_ib_line(pc, true);
-   if (  pc == nullptr
-      || (pc->type == CT_BRACE_CLOSE && pc->parent_type == CT_ASSIGN))
+   chunk_t *pc       = chunk_get_next_ncnl(start);
+   chunk_t *pcSingle = scan_ib_line(pc, true);
+   if (  pcSingle == nullptr
+      || (pcSingle->type == CT_BRACE_CLOSE && pcSingle->parent_type == CT_ASSIGN))
    {
       // single line - nothing to do
+      LOG_FMT(LALBR, "%s(%d): single line - nothing to do\n", __func__, __LINE__);
       return;
    }
+   LOG_FMT(LALBR, "%s(%d): is not a single line\n", __func__, __LINE__);
 
    do
    {
       pc = scan_ib_line(pc, false);
 
       // debug dump the current frame
+      LOG_FMT(LALBR, "%s(%d): debug dump after, orig_line is %zu\n",
+              __func__, __LINE__, pc->orig_line);
       align_log_al(LALBR, pc->orig_line);
 
       while (chunk_is_newline(pc))
@@ -1821,7 +1871,7 @@ static void align_init_brace(chunk_t *start)
                   //        next->text(), cpd.al[idx].col, cpd.al[idx].len);
 
                   if (  (idx < (cpd.al_cnt - 1))
-                     && cpd.settings[UO_align_number_left].b
+                     && cpd.settings[UO_align_number_right].b
                      && (  next->type == CT_NUMBER_FP
                         || next->type == CT_NUMBER
                         || next->type == CT_POS
@@ -1832,6 +1882,8 @@ static void align_init_brace(chunk_t *start)
                   }
                   else if (idx < (cpd.al_cnt - 1))
                   {
+                     LOG_FMT(LALBR, "%s(%d): idx is %zu, al_cnt is %zu, cpd.al[%zu].col is %zu, cpd.al[%zu].len is %zu\n",
+                             __func__, __LINE__, idx, cpd.al_cnt, idx, cpd.al[idx].col, idx, cpd.al[idx].len);
                      reindent_line(next, cpd.al[idx].col + cpd.al[idx].len);
                      chunk_flags_set(next, PCF_WAS_ALIGNED);
                   }
@@ -1845,7 +1897,7 @@ static void align_init_brace(chunk_t *start)
 
                // see if we need to right-align a number
                if (  (idx < (cpd.al_cnt - 1))
-                  && cpd.settings[UO_align_number_left].b)
+                  && cpd.settings[UO_align_number_right].b)
                {
                   next = chunk_get_next(pc);
                   if (  next != nullptr
@@ -1932,9 +1984,16 @@ static void align_left_shift(void)
    chunk_t *pc = chunk_get_head();
    while (pc != nullptr)
    {
-      LOG_FMT(LGUY, "%s(%d): pc->text() %s\n",
-              __func__, __LINE__, pc->text());
-      log_pcf_flags(LINDLINE, pc->flags);
+      if (pc->type == CT_NEWLINE)
+      {
+         LOG_FMT(LAVDB, "%s(%d): orig_line is %zu, NEWLINE\n", __func__, __LINE__, pc->orig_line);
+      }
+      else
+      {
+         LOG_FMT(LAVDB, "%s(%d): orig_line is %zu, orig_col is %zu, pc->text() '%s'\n",
+                 __func__, __LINE__, pc->orig_line, pc->orig_col, pc->text());
+         //log_pcf_flags(LINDLINE, pc->flags);
+      }
       if (  start != nullptr
          && ((pc->flags & PCF_IN_PREPROC) != (start->flags & PCF_IN_PREPROC)))
       {
@@ -1965,7 +2024,6 @@ static void align_left_shift(void)
       else if (  (!(pc->flags & PCF_IN_ENUM) && !(pc->flags & PCF_IN_TYPEDEF))
               && chunk_is_str(pc, "<<", 2))
       {
-         LOG_FMT(LGUY, "%s(%d): TEST GUY\n", __func__, __LINE__);
          log_pcf_flags(LINDLINE, pc->flags);
          if (pc->parent_type == CT_OPERATOR)
          {
