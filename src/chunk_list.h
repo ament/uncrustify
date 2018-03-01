@@ -40,7 +40,7 @@ enum class scope_e : unsigned int
 };
 
 
-void set_chunk_real(chunk_t *pc, c_token_t token, log_sev_t what, const char *str);
+void set_chunk_real(chunk_t *pc, c_token_t token, log_sev_t what);
 
 
 /**
@@ -288,6 +288,15 @@ chunk_t *chunk_get_prev_ncnl(chunk_t *cur, scope_e scope = scope_e::ALL);
  * @param scope  code region to search in
  */
 chunk_t *chunk_get_prev_ncnlnp(chunk_t *cur, scope_e scope = scope_e::ALL);
+
+
+/**
+ * Gets the prev non-NEWLINE and non-comment chunk, non-preprocessor chunk, non-DC_MEMBER chunk
+ *
+ * @param cur    chunk to use as start point
+ * @param scope  code region to search in
+ */
+chunk_t *chunk_get_prev_ncnlnpnd(chunk_t *cur, scope_e scope = scope_e::ALL);
 
 
 /**

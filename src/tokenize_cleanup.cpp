@@ -57,7 +57,7 @@ static void mark_selectors_in_property_with_open_paren(chunk_t *open_paren);
 
 /**
  * Marks ObjC specific chunks in propery declaration ( attributes)
- * Changes  all the CT_WORD to CT_OC_PROPERTY_ATTR
+ * Changes all the CT_WORD and CT_TYPE to CT_OC_PROPERTY_ATTR
  */
 static void mark_attributes_in_property_with_open_paren(chunk_t *open_paren);
 
@@ -153,7 +153,7 @@ void tokenize_cleanup(void)
          && !chunk_get_next_ncnl(pc, scope_e::PREPROC))
       {
          LOG_FMT(LNOTE, "%s(%d): %s:%zu Detected a macro that ends with a semicolon. Possible failures if used.\n",
-                 __func__, __LINE__, cpd.filename, pc->orig_line);
+                 __func__, __LINE__, cpd.filename.c_str(), pc->orig_line);
       }
    }
 
@@ -184,7 +184,7 @@ void tokenize_cleanup(void)
             if (next->type != CT_ASSIGN)
             {
                LOG_FMT(LERR, "%s(%d): %s:%zu: version: Unexpected token %s\n",
-                       __func__, __LINE__, cpd.filename, pc->orig_line, get_token_name(next->type));
+                       __func__, __LINE__, cpd.filename.c_str(), pc->orig_line, get_token_name(next->type));
                cpd.error_count++;
             }
             set_chunk_type(pc, CT_WORD);
@@ -774,8 +774,8 @@ void tokenize_cleanup(void)
       // Detect "pragma region" and "pragma endregion"
       if (pc->type == CT_PP_PRAGMA && next->type == CT_PREPROC_BODY)
       {
-         if (  (memcmp(next->str.c_str(), "region", 6) == 0)
-            || (memcmp(next->str.c_str(), "endregion", 9) == 0))
+         if (  (strncmp(next->str.c_str(), "region", 6) == 0)
+            || (strncmp(next->str.c_str(), "endregion", 9) == 0))
          // TODO: probably better use strncmp
          {
             set_chunk_type(pc, (*next->str.c_str() == 'r') ? CT_PP_REGION : CT_PP_ENDREGION);
@@ -1244,7 +1244,7 @@ static void mark_attributes_in_property_with_open_paren(chunk_t *open_paren)
    {
       if (  (tmp->type == CT_COMMA || tmp->type == CT_PAREN_OPEN)
          && tmp->next
-         && tmp->next->type == CT_WORD)
+         && (tmp->next->type == CT_WORD || tmp->next->type == CT_TYPE))
       {
          tmp->next->type = CT_OC_PROPERTY_ATTR;
       }

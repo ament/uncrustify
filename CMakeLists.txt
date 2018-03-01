@@ -43,6 +43,9 @@ elseif(CMAKE_COMPILER_IS_GNUCXX)
     endif()
     unset(flag_var)
   endforeach()
+  if(CMAKE_CXX_COMPILER_VERSION VERSION_LESS 5)
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-missing-field-initializers")
+  endif()
   unset(gcc_warning_flags)
 elseif(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   add_definitions(-std=gnu++0x)
@@ -120,7 +123,7 @@ endif()
 #
 
 # FIXME: the version number should be automatically integrated
-set(CURRENT_VERSION "Uncrustify-0.65_f")
+set(CURRENT_VERSION "Uncrustify-0.66.1_f")
 
 option(NoGitVersionString "Do not use make_version.py and git to build a version string" OFF)
 if(NOT NoGitVersionString)
@@ -207,6 +210,7 @@ add_executable(uncrustify
   src/unc_tools.cpp
   src/unicode.cpp
   src/universalindentgui.cpp
+  src/controlPSECount.cpp
   src/width.cpp
   src/align_stack.h
   src/args.h
@@ -230,6 +234,7 @@ add_executable(uncrustify
   src/unc_ctype.h
   src/unc_text.h
   src/unc_tools.h
+  src/controlPSECount.h
 )
 
 if(CMAKE_VERSION VERSION_LESS 2.8.10)
