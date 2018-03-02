@@ -532,7 +532,7 @@ static size_t calc_indent_continue(parse_frame_t &frm, size_t pse_tos)
    int ic = cpd.settings[UO_indent_continue].n;
 
    controlPSECount(frm.pse_tos);
-   if (ic < 0 && frm.pse[pse_tos].indent_cont > 0)
+   if (ic < 0 && frm.pse[pse_tos].indent_cont)
    {
       return(frm.pse[pse_tos].indent);
    }
