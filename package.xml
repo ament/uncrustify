@@ -2,7 +2,7 @@
 <?xml-model href="http://download.ros.org/schema/package_format2.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
 <package format="2">
   <name>uncrustify</name>
-  <version>0.61.20150413</version>
+  <version>0.66.1</version>
   <description>
     Package a newer version of uncrustify (0.61+, b6593c1, April 14th 2015).
   </description>
