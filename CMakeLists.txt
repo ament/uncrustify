@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 2.8)
 
-project(uncrustify)
+project(uncrustify_vendor)
 
 if("${PROJECT_SOURCE_DIR}" STREQUAL "${PROJECT_BINARY_DIR}")
   message(FATAL_ERROR "
@@ -271,7 +271,7 @@ endif()
 #
 # Package
 #
-set(CPACK_PACKAGE_NAME "uncrustify")
+set(CPACK_PACKAGE_NAME "uncrustify_vendor")
 set(CPACK_PACKAGE_VERSION "${CURRENT_VERSION}")
 set(CPACK_PACKAGE_VENDOR "Ben Gardner")
 set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "Code beautifier")
